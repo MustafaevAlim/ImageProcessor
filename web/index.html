@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ImageProcessor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .image-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .image-card img {
+            max-width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .image-info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .pagination button {
+            padding: 10px 20px;
+            border: 1px solid #4CAF50;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination button:disabled {
+            background-color: #ccc;
+            border-color: #ccc;
+            cursor: not-allowed;
+        }
+        .pagination-info {
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .total-count {
+            font-size: 14px;
+            color: #666;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-processed {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .status-processing {
+            background-color: #ff9800;
+            color: white;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="section">
+        <h1>Загрузить изображение</h1>
+        <form id="input_file" method="post">
+            <label for="file">Изображение:</label> <br>
+            <input type="file" name="img" id="img_file" required > <br>
+
+            <label for="type_processing">Тип обработки:</label> <br>
+            <select name="type_processing" id="type_processing" required>
+                <option value="resize">Изменение размера (Resize)</option>
+                <option value="thumbnail" selected>Миниатюра (Thumbnail)</option>
+                <option value="watermark">Водяной знак (Watermark)</option>
+            </select> <br> <br>
+
+            <div id="resize_options" style="display: none;">
+                <label>Ширина:</label>
+                <input type="number" name="width" id="width"> <br>
+                <label>Высота:</label>
+                <input type="number" name="height" id="height"> <br><br>
+            </div>
+
+            <div id="watermark_options" style="display: none;">
+                <label>Водяной знак:</label>
+                <input type="file" name="watermark" id="watermark"> <br><br>
+            </div>
+            
+            <button type="submit">Загрузить</button>
+        </form>
+    </div>
+
+    <div class="section">
+        <h1>Поиск изображения</h1>
+        <input type="number" id="search_image" placeholder="Айди изображения" required>
+        <button onclick="searchImage()">Поиск</button>
+        
+        <div id="result_search"></div>
+        <img id="result_image" style="display: none; margin-top: 10px;">
+    </div>
+
+    <div class="section">
+        <h1>Удалить изображение</h1>
+        <input type="number" id="delete_image" placeholder="Айди изображения" required>
+        <button onclick="deleteImage()">Удалить</button>
+        
+        <div id="result_delete"></div>
+    </div>
+
+    <!-- Галерея всех изображений с пагинацией -->
+    <div class="section">
+        <h1>Все изображения</h1>
+        
+        <div id="loading" style="display: none;">Загрузка...</div>
+        
+        <div id="gallery" class="gallery"></div>
+        
+        <div class="pagination">
+            <button id="prev_btn" onclick="loadPreviousPage()">← Предыдущие</button>
+            <div class="pagination-info">
+                <span id="page_info">Страница 1</span>
+                <span id="total_count" class="total-count">Всего: 0 изображений</span>
+            </div>
+            <button id="next_btn" onclick="loadNextPage()">Следующие →</button>
+        </div>
+    </div>
+
+    <script>
+        const API = "http://localhost/api/";
+
+        const inputFileForm = document.getElementById("input_file");
+        const typeProcessing = document.getElementById('type_processing');
+        const resizeOptions = document.getElementById('resize_options');
+        const watermarkOptions = document.getElementById('watermark_options');
+
+        // Переменные для пагинации
+        let currentImages = [];
+        let currentPage = 1;
+        let totalCount = 0;
+        let pageSize = 4; // Размер страницы (LIMIT в SQL)
+        let totalPages = 0;
+
+        typeProcessing.addEventListener('change', function() {
+            const value = this.value;
+            
+            resizeOptions.style.display = 'none';
+            watermarkOptions.style.display = 'none';
+            
+            if (value === 'resize') {
+                resizeOptions.style.display = 'block';
+            } else if (value === 'watermark') {
+                watermarkOptions.style.display = 'block';
+            }
+        });
+
+        inputFileForm.addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch(`${API}/upload`, {
+                    method: "POST",
+                    body: formData
+                });
+                const result = await response.json();
+                console.log(result);
+                
+                // Обновляем галерею после загрузки
+                loadInitialPage();
+            } catch (error) {
+                console.error(error);
+            }
+        });
+
+        async function searchImage() {
+            const id = document.getElementById("search_image").value.trim();
+            if (!id) {
+                return;
+            }
+
+            const img = document.getElementById('result_image');
+            const resultSearch = document.getElementById("result_search");
+            
+            try {
+                const response = await fetch(`${API}/image/${id}`, {
+                    method: "GET",
+                });
+                
+                if (!response.ok) {
+                    const res = await response.json();
+                    resultSearch.innerHTML = `<p style="color: red;">${res.error}</p>`;
+                    img.style.display = 'none';
+                    return;
+                }
+                
+                const res = await response.json();
+                resultSearch.innerHTML = '';
+                img.src = res.url; 
+                img.style.display = 'block';
+                img.alt = 'Обработанное изображение';
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function deleteImage() {
+            const id = document.getElementById("delete_image").value.trim();
+            if (!id) {
+                return;
+            }
+
+            try {
+                const resDelete = document.getElementById("result_delete");
+                const response = await fetch(`${API}/image/${id}`, {
+                    method: "DELETE",
+                });
+                const res = await response.json();
+                
+                if (!response.ok) {
+                    resDelete.innerHTML = `<p style="color: red;">${res.error}</p>`;
+                    return;
+                }
+                
+                resDelete.innerHTML = `<p style="color: green;">${res.result}</p>`;
+                
+                // Обновляем галерею после удаления
+                loadInitialPage();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        // === ФУНКЦИИ ПАГИНАЦИИ ===
+
+        // Загрузка первой страницы
+        async function loadInitialPage() {
+            showLoading(true);
+            
+            try {
+                const futureDate = new Date("0001-01-01T00:00:00Z").toISOString();
+                const response = await fetch(`${API}/images?last_created_at=${futureDate}&last_id=-1&mode=next`);
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки изображений');
+                }
+                
+                const data = await response.json();
+                currentImages = data.images || [];
+                totalCount = data.count || 0;
+                currentPage = 1;
+                
+                // Вычисляем общее количество страниц
+                totalPages = Math.ceil(totalCount / pageSize);
+                
+                displayImages(currentImages);
+                updatePaginationButtons();
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('gallery').innerHTML = 
+                    '<p style="color: red;">Ошибка загрузки изображений</p>';
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Загрузка следующей страницы
+        async function loadNextPage() {
+            if (currentImages.length === 0 || currentPage >= totalPages) return;
+            
+            showLoading(true);
+            
+            try {
+                const lastImage = currentImages[currentImages.length - 1];
+                const lastCreatedAt = new Date(lastImage.created_at).toISOString();
+                const lastID = lastImage.id;
+                
+                const response = await fetch(
+                    `${API}/images?last_created_at=${lastCreatedAt}&last_id=${lastID}&mode=next`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки');
+                }
+                
+                const data = await response.json();
+                const images = data.images || [];
+                totalCount = data.count || 0;
+                
+                if (images.length === 0) {
+                    alert('Это последняя страница');
+                    return;
+                }
+                
+                currentImages = images;
+                currentPage++;
+                totalPages = Math.ceil(totalCount / pageSize);
+                
+                displayImages(images);
+                updatePaginationButtons();
+            } catch (error) {
+                console.error('Ошибка:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Загрузка предыдущей страницы
+        async function loadPreviousPage() {
+            if (currentImages.length === 0 || currentPage === 1) return;
+            
+            showLoading(true);
+            
+            try {
+                const firstImage = currentImages[0];
+                const firstCreatedAt = new Date(firstImage.created_at).toISOString();
+                const firstID = firstImage.id;
+                
+                const response = await fetch(
+                    `${API}/images?last_created_at=${firstCreatedAt}&last_id=${firstID}&mode=prev`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки');
+                }
+                
+                const data = await response.json();
+                const images = data.images || [];
+                totalCount = data.count || 0;
+                
+                if (images.length === 0) {
+                    alert('Это первая страница');
+                    return;
+                }
+                
+                currentImages = images.reverse();
+                currentPage--;
+                totalPages = Math.ceil(totalCount / pageSize);
+                
+                displayImages(currentImages);
+                updatePaginationButtons();
+            } catch (error) {
+                console.error('Ошибка:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+
+        function displayImages(images, urls) {
+            const gallery = document.getElementById('gallery');
+            
+            if (images.length === 0) {
+                gallery.innerHTML = '<p>Нет изображений</p>';
+                return;
+            }
+            
+            gallery.innerHTML = images.map(img => {
+                return `
+                    <div class="image-card">
+                        <img src="${img.url}" 
+                            alt="Image ${img.id}">
+                        <div class="image-info">
+                            <p><strong>ID:</strong> ${img.id}</p>
+                            <p>
+                                <span class="status-badge ${img.processed ? 'status-processed' : 'status-processing'}">
+                                    ${img.processed ? 'Обработано' : 'Обработка...'}
+                                </span>
+                            </p>
+                            <p><small>${new Date(img.created_at).toLocaleString('ru-RU')}</small></p>
+                            <button onclick="viewImage(${img.id})" style="margin-top: 5px;">Просмотр</button>
+                            <button onclick="confirmDelete(${img.id})" style="background-color: #f44336;">Удалить</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Обновление кнопок пагинации
+        function updatePaginationButtons() {
+            const prevBtn = document.getElementById('prev_btn');
+            const nextBtn = document.getElementById('next_btn');
+            const pageInfo = document.getElementById('page_info');
+            const totalCountElem = document.getElementById('total_count');
+            
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage >= totalPages;
+            
+            pageInfo.textContent = `Страница ${currentPage} из ${totalPages}`;
+            totalCountElem.textContent = `Всего: ${totalCount} ${getImageWord(totalCount)}`;
+        }
+
+        // Склонение слова "изображение"
+        function getImageWord(count) {
+            const lastDigit = count % 10;
+            const lastTwoDigits = count % 100;
+            
+            if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+                return 'изображений';
+            }
+            if (lastDigit === 1) {
+                return 'изображение';
+            }
+            if (lastDigit >= 2 && lastDigit <= 4) {
+                return 'изображения';
+            }
+            return 'изображений';
+        }
+
+        // Показать/скрыть загрузку
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('gallery').style.display = show ? 'none' : 'grid';
+        }
+
+        // Просмотр изображения
+        function viewImage(id) {
+            document.getElementById('search_image').value = id;
+            searchImage();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Подтверждение удаления
+        function confirmDelete(id) {
+            if (confirm(`Вы уверены, что хотите удалить изображение #${id}?`)) {
+                document.getElementById('delete_image').value = id;
+                deleteImage();
+            }
+        }
+
+        // Загружаем первую страницу при загрузке
+        window.addEventListener('DOMContentLoaded', function() {
+            loadInitialPage();
+        });
+    </script>
+</body>
+</html>

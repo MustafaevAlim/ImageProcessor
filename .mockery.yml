@@ -1,0 +1,23 @@
+all: false
+dir: '{{.InterfaceDir}}'
+filename: "./mocks/{{.InterfaceName}}_mock.go"
+force-file-write: true
+formatter: goimports
+include-auto-generated: false
+log-level: info
+structname: '{{.Mock}}{{.InterfaceName}}'
+recursive: false
+require-template-schema-exists: true
+
+packages:
+  ImageProcessor/internal/repository:
+    config:
+      all: false
+      pkgname: 'mocks'
+    interfaces:
+      Storager:
+      ImageTaskConsumer:
+      ImageTaskProducer:
+      ImageStore:
+
+    
