@@ -146,7 +146,11 @@ func (s *Storage) GetImages(ctx context.Context, lastCreatedAt time.Time, lastID
 		return nil, err
 	}
 
-	defer res.Close()
+	defer func() {
+		if err := res.Close(); err != nil {
+			zlog.Logger.Error().Msg(err.Error())
+		}
+	}()
 
 	images := make([]model.ImageInRepo, 0)
 	for res.Next() {

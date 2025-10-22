@@ -33,7 +33,11 @@ func (h *Handler) UploadImage(c *ginext.Context) {
 		WriteJSONError(c, err, http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			zlog.Logger.Error().Msg(err.Error())
+		}
+	}()
 
 	objectName := fmt.Sprintf("uploads/%s%s", uuid.New().String(), ext)
 
@@ -116,7 +120,11 @@ func getParameters(c *ginext.Context, typeProcessing string, task *model.ImageTa
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				zlog.Logger.Error().Msg(err.Error())
+			}
+		}()
 
 		ext := filepath.Ext(fileHeader.Filename)
 		watermarkObjectName := fmt.Sprintf("watermarks/%s%s", uuid.New().String(), ext)

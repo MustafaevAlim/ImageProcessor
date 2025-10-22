@@ -55,7 +55,11 @@ func resize(is ImageService) (model.ImageInRepo, error) {
 	if err != nil {
 		return model.ImageInRepo{}, err
 	}
-	defer baseFile.Close()
+	defer func() {
+		if err := baseFile.Close(); err != nil {
+			zlog.Logger.Error().Msg(err.Error())
+		}
+	}()
 
 	buf := &bytes.Buffer{}
 	_, err = buf.ReadFrom(baseFile)
@@ -164,7 +168,11 @@ func watermark(is ImageService) (model.ImageInRepo, error) {
 	if err != nil {
 		return model.ImageInRepo{}, err
 	}
-	defer baseFile.Close()
+	defer func() {
+		if err := baseFile.Close(); err != nil {
+			zlog.Logger.Error().Msg(err.Error())
+		}
+	}()
 
 	baseImg, format, err := image.Decode(baseFile)
 	if err != nil {
@@ -175,7 +183,11 @@ func watermark(is ImageService) (model.ImageInRepo, error) {
 	if err != nil {
 		return model.ImageInRepo{}, err
 	}
-	defer overlayFile.Close()
+	defer func() {
+		if err := overlayFile.Close(); err != nil {
+			zlog.Logger.Error().Msg(err.Error())
+		}
+	}()
 
 	overlayImg, _, err := image.Decode(overlayFile)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 func SetupRoutes(h *handlers.Handler, g *ginext.Engine) {
 	g.Use(ginext.Logger(), ginext.Recovery())
 	g.LoadHTMLGlob("web/*.html")
-	g.Static("/static", "./static")
+
 	g.POST("/upload", h.UploadImage)
 	g.GET("/image/:id", h.GetImage)
 	g.GET("/images", h.GetImages)
