@@ -140,7 +140,6 @@
         <div id="result_delete"></div>
     </div>
 
-    <!-- Галерея всех изображений с пагинацией -->
     <div class="section">
         <h1>Все изображения</h1>
         
@@ -166,11 +165,10 @@
         const resizeOptions = document.getElementById('resize_options');
         const watermarkOptions = document.getElementById('watermark_options');
 
-        // Переменные для пагинации
         let currentImages = [];
         let currentPage = 1;
         let totalCount = 0;
-        let pageSize = 4; // Размер страницы (LIMIT в SQL)
+        let pageSize = 4;
         let totalPages = 0;
 
         typeProcessing.addEventListener('change', function() {
@@ -198,7 +196,6 @@
                 const result = await response.json();
                 console.log(result);
                 
-                // Обновляем галерею после загрузки
                 loadInitialPage();
             } catch (error) {
                 console.error(error);
@@ -256,14 +253,12 @@
                 
                 resDelete.innerHTML = `<p style="color: green;">${res.result}</p>`;
                 
-                // Обновляем галерею после удаления
                 loadInitialPage();
             } catch (e) {
                 alert(e.message);
             }
         }
 
-        // === ФУНКЦИИ ПАГИНАЦИИ ===
 
         // Загрузка первой страницы
         async function loadInitialPage() {
@@ -282,7 +277,6 @@
                 totalCount = data.count || 0;
                 currentPage = 1;
                 
-                // Вычисляем общее количество страниц
                 totalPages = Math.ceil(totalCount / pageSize);
                 
                 displayImages(currentImages);
@@ -452,7 +446,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Подтверждение удаления
         function confirmDelete(id) {
             if (confirm(`Вы уверены, что хотите удалить изображение #${id}?`)) {
                 document.getElementById('delete_image').value = id;
@@ -460,7 +453,6 @@
             }
         }
 
-        // Загружаем первую страницу при загрузке
         window.addEventListener('DOMContentLoaded', function() {
             loadInitialPage();
         });
