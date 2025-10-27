@@ -42,7 +42,6 @@ func TestGetImage(t *testing.T) {
 					Processed:     true,
 				}
 				db.On("GetImage", mock.Anything, id).Return(img, nil).Once()
-				is.On("GetURL", mock.Anything, img).Return(img.ProcessedPath, nil).Once()
 			},
 			in:             InputData{id: "10"},
 			expectedStatus: http.StatusOK,
@@ -84,14 +83,13 @@ func TestGetImage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockDB := mocks.NewMockStorager(t)
-			mockImageService := mocks.NewMockImageStore(t)
 
 			id, err := strconv.Atoi(tt.in.id)
 			require.NoError(t, err)
 
-			tt.setupMock(mockDB, mockImageService, id)
+			tt.setupMock(mockDB, nil, id)
 
-			h := handlers.NewHandler(mockDB, nil, mockImageService)
+			h := handlers.NewHandler(mockDB, nil, nil)
 
 			rr := httptest.NewRecorder()
 			g, _ := gin.CreateTestContext(rr)
@@ -110,7 +108,6 @@ func TestGetImage(t *testing.T) {
 
 			require.Contains(t, tt.expectedData["result"], response["result"])
 			mockDB.AssertExpectations(t)
-			mockImageService.AssertExpectations(t)
 
 		})
 	}
